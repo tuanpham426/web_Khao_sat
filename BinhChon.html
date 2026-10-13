@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khảo Sát Phát Triển Ứng Dụng - App Survey Quest</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Firebase App & Realtime Database SDKs (Compat version for clean single-file script) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      background-color: #0c0d16;
+      color: #f1f5f9;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* Sakura Canvas overlaying everything */
+    #sakuraCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 40;
+    }
+
+    /* 3D Card Flip styles */
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      text-align: center;
+      transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transform-style: preserve-3d;
+      cursor: pointer;
+    }
+
+    .card-inner.is-flipped {
+      transform: rotateY(180deg) scale(1.03);
+    }
+
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+      border-radius: 1rem;
+    }
+
+    .card-back {
+      transform: rotateY(180deg);
+    }
+
+    /* Subtle glowing animations */
+    @keyframes pulseGlow {
+      0%, 100% {
+        box-shadow: 0 0 15px rgba(236, 72, 153, 0.25), 0 0 30px rgba(99, 102, 241, 0.15);
+      }
+      50% {
+        box-shadow: 0 0 28px rgba(236, 72, 153, 0.45), 0 0 50px rgba(99, 102, 241, 0.3);
+      }
+    }
+
+    .glow-card {
+      animation: pulseGlow 3.5s infinite ease-in-out;
+    }
+
+    /* 12-Pointed Star rotation & sparkle */
+    @keyframes starTwist {
+      0% { transform: rotate(0deg) scale(1); }
+      50% { transform: rotate(180deg) scale(1.08); }
+      100% { transform: rotate(360deg) scale(1); }
+    }
+
+    .animate-star-twelve {
+      animation: starTwist 20s linear infinite;
+    }
+
+    /* Shimmer progress effect */
+    @keyframes barShimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(200%); }
+    }
+
+    .shimmer-bar::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 60%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+      animation: barShimmer 2.2s infinite ease-in-out;
+    }
+
+    /* Equalizer wave animation */
+    @keyframes eqBar {
+      0%, 100% { height: 4px; }
+      50% { height: 16px; }
+    }
+    .eq-bar-1 { animation: eqBar 0.6s infinite ease-in-out; }
+    .eq-bar-2 { animation: eqBar 0.8s infinite ease-in-out 0.2s; }
+    .eq-bar-3 { animation: eqBar 0.5s infinite ease-in-out 0.4s; }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f111a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3b4261;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #ec4899;
+    }
+  </style>
+</head>
+<body class="relative flex flex-col justify-between select-none">
+
+  <!-- Sakura Falling Effect Canvas (Overlays all UI) -->
+  <canvas id="sakuraCanvas"></canvas>
+
+  <!-- Ambient background glow spots -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-pink-600/15 rounded-full blur-[110px]"></div>
+    <div class="absolute top-1/2 -right-32 w-96 h-96 bg-indigo-600/15 rounded-full blur-[120px]"></div>
+    <div class="absolute -bottom-32 left-1/3 w-96 h-96 bg-amber-500/10 rounded-full blur-[130px]"></div>
+  </div>
+
+  <!-- Top Header Bar -->
+  <header class="relative z-30 w-full max-w-5xl mx-auto px-4 py-4 sm:py-6 flex items-center justify-between">
+    <!-- Brand / Logo: 12-Pointed Star -->
+    <div class="flex items-center gap-3">
+      <div class="relative w-11 h-11 flex items-center justify-center rounded-xl bg-gradient-to-br from-amber-400/20 via-pink-500/20 to-purple-600/20 border border-amber-300/40 shadow-lg shadow-pink-500/10">
+        <!-- 12-Pointed Star SVG Graphic -->
+        <svg class="w-8 h-8 animate-star-twelve text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]" viewBox="0 0 100 100" fill="currentColor">
+          <!-- 3 overlapped rotated squares = 12-pointed star (Dodecagram) -->
+          <rect x="15" y="15" width="70" height="70" rx="4" transform="rotate(0 50 50)" />
+          <rect x="15" y="15" width="70" height="70" rx="4" transform="rotate(30 50 50)" opacity="0.9" />
+          <rect x="15" y="15" width="70" height="70" rx="4" transform="rotate(60 50 50)" opacity="0.85" />
+          <circle cx="50" cy="50" r="14" fill="#0c0d16" />
+          <circle cx="50" cy="50" r="8" fill="#f43f5e" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-lg sm:text-xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-pink-300 to-indigo-200">
+          SURVEY QUEST
+        </h1>
+        <p id="headerSubtitle" class="text-xs text-slate-400 font-medium tracking-wider">
+          Khảo Sát Người Dùng • Nghiên Cứu App
+        </p>
+      </div>
+    </div>
+
+    <!-- Controls: Music toggle & Language Switcher -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <!-- Language Toggle Button -->
+      <button id="langToggleBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-xs font-semibold text-slate-200 transition-all active:scale-95 shadow-sm">
+        <span id="langFlag">🇻🇳</span>
+        <span id="langText">VI</span>
+      </button>
+
+      <!-- Music Player Button -->
+      <button id="musicToggleBtn" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-pink-950/40 hover:bg-pink-900/50 border border-pink-500/30 text-xs font-medium text-pink-300 transition-all active:scale-95 shadow-sm">
+        <div id="eqIcon" class="flex items-end gap-0.5 h-4 w-4">
+          <span class="w-1 bg-pink-400 rounded-full eq-bar-1"></span>
+          <span class="w-1 bg-pink-400 rounded-full eq-bar-2"></span>
+          <span class="w-1 bg-pink-400 rounded-full eq-bar-3"></span>
+        </div>
+        <span id="musicBtnLabel">Nhạc Vui</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="relative z-30 flex-1 w-full max-w-4xl mx-auto px-4 py-4 flex flex-col justify-center">
+
+    <!-- VIEW 1: Survey Question Step Card -->
+    <div id="questionView" class="w-full bg-slate-900/75 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 sm:p-8 shadow-2xl glow-card">
+      
+      <!-- Progress Bar & Indicator -->
+      <div class="flex items-center justify-between text-xs sm:text-sm font-semibold mb-3">
+        <span class="flex items-center gap-2 text-pink-400 font-bold tracking-wider">
+          <span class="w-2 h-2 rounded-full bg-pink-400 animate-ping"></span>
+          <span id="questionStepLabel">CÂU HỎI 1 / 20</span>
+        </span>
+        <span id="progressPercent" class="text-slate-400 font-mono">5%</span>
+      </div>
+      <div class="relative w-full h-2.5 bg-slate-800 rounded-full overflow-hidden mb-6 sm:mb-8 border border-slate-700/50">
+        <div id="progressBar" class="relative h-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full transition-all duration-500 ease-out shimmer-bar" style="width: 5%;"></div>
+      </div>
+
+      <!-- Question Title & Category Icon -->
+      <div class="mb-6 sm:mb-8 text-center sm:text-left">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-xs text-slate-300 mb-3">
+          <span id="questionCategoryIcon">📱</span>
+          <span id="questionCategory">Trải nghiệm & Thiết bị</span>
+        </div>
+        <h2 id="questionTitle" class="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-100 leading-snug">
+          Bạn thường dùng hệ điều hành di động nào nhất để cài app mới?
+        </h2>
+        <p id="questionSubtitle" class="text-xs sm:text-sm text-slate-400 mt-2">
+          Chọn phương án sát với thói quen trải nghiệm của bạn nhất
+        </p>
+      </div>
+
+      <!-- Options List -->
+      <div id="optionsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
+        <!-- Dynamic Option Buttons -->
+      </div>
+
+      <!-- Bottom Nav: Back Button -->
+      <div class="flex items-center justify-between pt-4 border-t border-slate-800/80">
+        <button id="prevBtn" class="hidden items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+          <span id="prevBtnLabel">Quay lại câu trước</span>
+        </button>
+        <div class="text-xs text-slate-500 ml-auto flex items-center gap-1 font-medium">
+          <span id="tipLabel">💡 Chạm vào đáp án để tự động tiếp tục</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: Mystery Card Flip Step (Step 21 - Thank You Gift) -->
+    <div id="rewardView" class="hidden w-full bg-slate-900/80 backdrop-blur-xl border border-pink-500/30 rounded-2xl p-5 sm:p-8 shadow-2xl text-center glow-card">
+      
+      <!-- Header of Reward Stage -->
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-pink-500/10 border border-pink-500/30 text-xs sm:text-sm text-pink-300 font-bold mb-3">
+        <span>✨</span>
+        <span id="rewardBadge">BƯỚC 21: TRI ÂN ĐẶC BIỆT</span>
+      </div>
+      
+      <h2 id="rewardMainHeading" class="text-2xl sm:text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-pink-300 to-indigo-200 mb-2">
+        QUÀ CẢM ƠN
+      </h2>
+      <p id="rewardPrompt" class="text-xs sm:text-base text-slate-300 max-w-xl mx-auto mb-6 sm:mb-8 font-medium">
+        Chúc mừng bạn đã hoàn thành khảo sát! Hãy chọn một lá bài may mắn để nhận một món quà hiện vật nhỏ từ tác giả nhé!
+      </p>
+
+      <!-- 6 Mystery Cards 3D Layout (2 cols mobile, 3 cols desktop) -->
+      <div id="cardsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-6 max-w-3xl mx-auto mb-8 perspective-1000">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Reveal Result Box (Hidden until a card is tapped) -->
+      <div id="rewardResultBox" class="hidden max-w-xl mx-auto p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-pink-950/40 via-purple-950/30 to-slate-900/70 border border-pink-500/40 shadow-xl transition-all">
+        <div class="text-3xl sm:text-4xl mb-2 animate-bounce">🎁</div>
+        <div id="rewardRevealedTitle" class="text-sm sm:text-base text-pink-300 font-bold uppercase tracking-wider mb-1">
+          BẠN ĐÃ MỞ ĐƯỢC
+        </div>
+        <div id="rewardRevealedName" class="text-xl sm:text-2xl font-black text-amber-200 mb-3 drop-shadow">
+          1 LY TRÀ SỮA FULL TOPPING
+        </div>
+
+        <!-- Official Claim Notification -->
+        <div class="p-3 sm:p-4 rounded-xl bg-pink-500/15 border border-pink-400/30 text-xs sm:text-sm text-pink-100 font-medium mb-4 flex items-center justify-center gap-2">
+          <span class="text-lg">💖</span>
+          <span id="claimNoticeText">Liên hệ người gửi để nhận quà. Cảm ơn bạn đã tham gia khảo sát!</span>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button id="copyGiftBtn" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-pink-600/30 active:scale-95 transition-all flex items-center justify-center gap-2">
+            <span>📋</span>
+            <span id="copyGiftBtnLabel">Sao Chép Tên Quà Để Nhắn Tin</span>
+          </button>
+          <button id="viewStatsBtn" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs sm:text-sm font-bold active:scale-95 transition-all flex items-center justify-center gap-2">
+            <span>📊</span>
+            <span id="viewStatsBtnLabel">Xem Thống Kê Thực Tế</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: Real Database Statistics View -->
+    <div id="statsView" class="hidden w-full bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-5 sm:p-8 shadow-2xl">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-800 gap-4">
+        <div>
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-xs text-indigo-300 font-semibold mb-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="statsSyncStatus">Firebase Realtime Sync</span>
+          </div>
+          <h2 id="statsTitle" class="text-xl sm:text-3xl font-extrabold text-slate-100">
+            KẾT QUẢ THỐNG KÊ CỘNG ĐỒNG
+          </h2>
+          <p id="statsTotalParticipants" class="text-xs sm:text-sm text-slate-400 mt-1">
+            Đang tải dữ liệu thực tế từ máy chủ...
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="retakeSurveyBtn" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs sm:text-sm font-semibold text-slate-300 transition-all flex items-center gap-1.5 active:scale-95">
+            <span>🔄</span>
+            <span id="retakeBtnLabel">Làm lại khảo sát</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Question Stats Accordion / List -->
+      <div id="statsContentList" class="divide-y divide-slate-800/80 mt-6 max-h-[60vh] overflow-y-auto pr-2">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="relative z-30 w-full max-w-5xl mx-auto px-4 py-4 text-center text-xs text-slate-500">
+    <p id="footerCopy">Khảo sát nghiên cứu phát triển sản phẩm • Dữ liệu ẩn danh & đồng bộ trực tiếp</p>
+  </footer>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    /* =====================================================================
+       1. FIREBASE CONFIGURATION & INITIALIZATION
+       ===================================================================== */
+    const firebaseConfig = {
+      apiKey: "AIzaSyCbuuJuCIKIMWarg047MQ-tI9qrC6G8ZYE",
+      authDomain: "binhchonapp.firebaseapp.com",
+      databaseURL: "https://binhchonapp-default-rtdb.firebaseio.com",
+      projectId: "binhchonapp",
+      storageBucket: "binhchonapp.firebasestorage.app",
+      messagingSenderId: "22332162158",
+      appId: "1:22332162158:web:a529a855659ddc886a667f",
+      measurementId: "G-RY6GJBNDV9"
+    };
+
+    let db = null;
+    let isFirebaseReady = false;
+
+    try {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      isFirebaseReady = true;
+      console.log("Firebase Realtime Database initialized successfully!");
+    } catch (err) {
+      console.error("Firebase init fallback:", err);
+    }
+
+    /* =====================================================================
+       2. BILINGUAL DICTIONARY (VI / EN)
+       ===================================================================== */
+    let currentLang = localStorage.getItem('app_survey_lang') || 'vi';
+
+    const I18N = {
+      vi: {
+        flag: "🇻🇳",
+        langText: "VI",
+        headerSub: "Khảo Sát Người Dùng • Nghiên Cứu App",
+        musicLabel: "Nhạc Vui",
+        musicOff: "Tắt Nhạc",
+        stepPrefix: "CÂU HỎI",
+        tipLabel: "💡 Chạm vào đáp án để tự động tiếp tục",
+        prevBtn: "Quay lại câu trước",
+        rewardBadge: "BƯỚC 21: TRI ÂN ĐẶC BIỆT",
+        rewardMain: "QUÀ CẢM ƠN",
+        rewardPrompt: "Chúc mừng bạn đã hoàn thành khảo sát! Hãy chọn một lá bài may mắn để nhận một món quà hiện vật nhỏ từ tác giả nhé!",
+        rewardRevealedTitle: "BẠN ĐÃ MỞ ĐƯỢC",
+        claimNotice: "Liên hệ người gửi để nhận quà. Cảm ơn bạn đã tham gia khảo sát!",
+        copyBtn: "Sao Chép Tên Quà Để Nhắn Tin",
+        copied: "Đã sao chép tin nhắn!",
+        viewStatsBtn: "Xem Thống Kê Thực Tế",
+        statsTitle: "KẾT QUẢ THỐNG KÊ CỘNG ĐỒNG",
+        statsTotal: (n) => `Tổng cộng có ${n} lượt người tham gia bình chọn thực tế được ghi nhận`,
+        statsLoading: "Đang tải dữ liệu thực tế từ máy chủ...",
+        retakeBtn: "Làm lại khảo sát",
+        footerText: "Khảo sát nghiên cứu phát triển sản phẩm • Dữ liệu ẩn danh & bảo mật",
+        yourChoice: "LỰA CHỌN CỦA BẠN",
+        votesCount: (count, pct) => `${count} lượt (${pct}%)`,
+        shareMsg: (reward) => `Chào bạn! Mình vừa hoàn thành bài khảo sát App và đã lật thẻ nhận được phần quà: "${reward}". Mình nhắn tin để liên hệ nhận quà nha!`
+      },
+      en: {
+        flag: "🇬🇧",
+        langText: "EN",
+        headerSub: "User Research • App UX/UI Survey",
+        musicLabel: "BGM On",
+        musicOff: "Mute BGM",
+        stepPrefix: "QUESTION",
+        tipLabel: "💡 Tap any option to proceed automatically",
+        prevBtn: "Previous Question",
+        rewardBadge: "STEP 21: SPECIAL APPRECIATION",
+        rewardMain: "THANK YOU GIFT",
+        rewardPrompt: "Congratulations on completing the survey! Pick one mystery card to reveal your real thank-you reward!",
+        rewardRevealedTitle: "YOU HAVE UNLOCKED",
+        claimNotice: "Please contact the sender to claim your reward. Thank you for participating in this survey!",
+        copyBtn: "Copy Reward Name To Send Message",
+        copied: "Message copied to clipboard!",
+        viewStatsBtn: "View Real-time Statistics",
+        statsTitle: "COMMUNITY POLL RESULTS",
+        statsTotal: (n) => `A total of ${n} verified participant votes recorded`,
+        statsLoading: "Loading verified live data from server...",
+        retakeBtn: "Retake Survey",
+        footerText: "Product UX/UI Research Survey • Anonymous & Secure Data",
+        yourChoice: "YOUR CHOICE",
+        votesCount: (count, pct) => `${count} votes (${pct}%)`,
+        shareMsg: (reward) => `Hi there! I just finished your App survey and opened the mystery card with reward: "${reward}". Messaging you to claim it! Thank you!`
+      }
+    };
+
+    /* =====================================================================
+       3. 20 APP DEVELOPMENT SURVEY QUESTIONS DATA
+       ===================================================================== */
+    const QUESTIONS_DATA = [
+      {
+        id: "q1",
+        catIcon: "📱",
+        cat: { vi: "Thiết bị & Nền tảng", en: "Devices & Platform" },
+        title: { 
+          vi: "Bạn dùng hệ điều hành di động nào nhiều nhất hàng ngày?", 
+          en: "Which mobile operating system do you use most daily?" 
+        },
+        sub: { 
+          vi: "Chọn nền tảng chính mà bạn trải nghiệm app", 
+          en: "Select your primary smartphone ecosystem" 
+        },
+        options: [
+          { key: "ios", label: { vi: "iOS (iPhone / iPad)", en: "iOS (iPhone / iPad)" }, icon: "🍎" },
+          { key: "android", label: { vi: "Android (Samsung, Xiaomi, Pixel...)", en: "Android (Samsung, Xiaomi, Pixel...)" }, icon: "🤖" },
+          { key: "both", label: { vi: "Dùng song song cả hai máy", en: "Both iOS & Android simultaneously" }, icon: "📲" },
+          { key: "other", label: { vi: "Chủ yếu dùng Web trên Máy tính", en: "Mainly Desktop / Web Browser" }, icon: "💻" }
+        ]
+      },
+      {
+        id: "q2",
+        catIcon: "🌓",
+        cat: { vi: "Giao diện (UI)", en: "User Interface (UI)" },
+        title: { 
+          vi: "Bạn thích giao diện Dark Mode (Tối) hay Light Mode (Sáng)?", 
+          en: "Do you prefer Dark Mode or Light Mode interface?" 
+        },
+        sub: { 
+          vi: "Tone màu làm bạn cảm thấy thoải mái khi lướt lâu", 
+          en: "Visual tone that gives you the best comfort" 
+        },
+        options: [
+          { key: "dark", label: { vi: "Dark Mode 100% (Dịu mắt, tiết kiệm pin)", en: "Always Dark Mode (Easy on eyes, saves battery)" }, icon: "🌙" },
+          { key: "light", label: { vi: "Light Mode (Sáng sủa, chữ rõ ràng)", en: "Always Light Mode (Clean, high contrast)" }, icon: "☀️" },
+          { key: "auto", label: { vi: "Tự động đổi theo ngày/đêm của hệ thống", en: "Auto switch following system schedule" }, icon: "🔄" },
+          { key: "custom_theme", label: { vi: "Có bảng màu chủ đề tùy chọn riêng", en: "Custom color themes & palettes" }, icon: "🎨" }
+        ]
+      },
+      {
+        id: "q3",
+        catIcon: "⚡",
+        cat: { vi: "Hiệu năng & Trải nghiệm", en: "Performance & UX" },
+        title: { 
+          vi: "Điều gì quan trọng hơn với bạn trong một ứng dụng?", 
+          en: "What matters more to you in a mobile app?" 
+        },
+        sub: { 
+          vi: "Sự cân bằng giữa vẻ đẹp thị giác và tốc độ phản hồi", 
+          en: "The balance between visual aesthetics and raw speed" 
+        },
+        options: [
+          { key: "speed", label: { vi: "Mở tức thì, cực nhẹ, không có độ trễ", en: "Instant load, ultra-lightweight, zero lag" }, icon: "⚡" },
+          { key: "animation", label: { vi: "Animation mượt mà, chuyển động đẹp mắt", en: "Smooth animations & fluid micro-interactions" }, icon: "✨" },
+          { key: "balance", label: { vi: "Cân bằng hài hòa cả hai yếu tố", en: "Harmonious balance of both speed and beauty" }, icon: "⚖️" },
+          { key: "features", label: { vi: "Đầy đủ tính năng, hơi chậm chút cũng được", en: "Rich feature set over pure performance" }, icon: "🛠️" }
+        ]
+      },
+      {
+        id: "q4",
+        catIcon: "🔐",
+        cat: { vi: "Bảo mật & Đăng nhập", en: "Authentication" },
+        title: { 
+          vi: "Phương thức đăng nhập bạn ưa thích nhất khi dùng app mới?", 
+          en: "What is your preferred sign-in method for new apps?" 
+        },
+        sub: { 
+          vi: "Cách tạo tài khoản mang lại sự tiện lợi và tin cậy", 
+          en: "Sign-up flow that provides the best convenience" 
+        },
+        options: [
+          { key: "google_apple", label: { vi: "Đăng nhập 1 chạm (Google / Apple ID)", en: "One-tap sign-in (Google / Apple ID)" }, icon: "👆" },
+          { key: "biometric", label: { vi: "Vân tay / FaceID sinh trắc học", en: "Biometric (Face ID / Fingerprint)" }, icon: "🧬" },
+          { key: "otp_phone", label: { vi: "Số điện thoại gửi mã OTP qua Zalo/SMS", en: "Phone number with OTP code" }, icon: "📩" },
+          { key: "guest", label: { vi: "Chế độ Khách (Dùng trước, đăng ký sau)", en: "Guest Mode (Try first, register later)" }, icon: "👤" }
+        ]
+      },
+      {
+        id: "q5",
+        catIcon: "🔔",
+        cat: { vi: "Thông báo (Push)", en: "Push Notifications" },
+        title: { 
+          vi: "Bạn có thường cho phép app gửi Thông báo (Push Notification)?", 
+          en: "How do you treat app Push Notifications?" 
+        },
+        sub: { 
+          vi: "Mức độ bạn sẵn lòng đón nhận tin nhắn từ ứng dụng", 
+          en: "Your tolerance for system push updates" 
+        },
+        options: [
+          { key: "important_only", label: { vi: "Chỉ cho phép nếu là tin tức cực kỳ quan trọng", en: "Only critical and urgent alerts" }, icon: "⚠️" },
+          { key: "daily_reminder", label: { vi: "Thích thông báo nhắc nhở tiến độ mỗi ngày", en: "Welcome daily routine & progress reminders" }, icon: "⏰" },
+          { key: "block_all", label: { vi: "Tắt toàn bộ ngay từ lần đầu mở app", en: "Blocked completely on first launch" }, icon: "🔕" },
+          { key: "smart_digest", label: { vi: "Thích tóm tắt 1 lần vào cuối ngày", en: "Prefer a single evening digest summary" }, icon: "📋" }
+        ]
+      },
+      {
+        id: "q6",
+        catIcon: "🧭",
+        cat: { vi: "Điều hướng (Navigation)", en: "Navigation Pattern" },
+        title: { 
+          vi: "Bạn thích kiểu điều hướng chính nào trên điện thoại?", 
+          en: "Which main navigation style feels most intuitive?" 
+        },
+        sub: { 
+          vi: "Cách bạn di chuyển giữa các màn hình chức năng", 
+          en: "How you browse through app views" 
+        },
+        options: [
+          { key: "bottom_bar", label: { vi: "Thanh menu dưới đáy màn hình (Bottom Bar)", en: "Bottom Tab Bar (Thumb-friendly)" }, icon: "🔽" },
+          { key: "gestures", label: { vi: "Vuốt cạnh màn hình (Swipe Gestures)", en: "Edge Swiping Gestures" }, icon: "👉" },
+          { key: "drawer_menu", label: { vi: "Menu Hamburger 3 gạch ẩn bên góc", en: "Hidden Hamburger side drawer" }, icon: "🍔" },
+          { key: "fab_search", label: { vi: "Nút bấm nổi tròn (Floating Action Button)", en: "Prominent Floating Action Button (FAB)" }, icon: "🔘" }
+        ]
+      },
+      {
+        id: "q7",
+        catIcon: "🚀",
+        cat: { vi: "Lần đầu làm quen (Onboarding)", en: "Onboarding Flow" },
+        title: { 
+          vi: "Khi mở app lần đầu, bạn có đọc phần hướng dẫn sử dụng không?", 
+          en: "Do you read onboarding walkthrough tutorials?" 
+        },
+        sub: { 
+          vi: "Thói quen tiếp cận các tính năng mới", 
+          en: "Your approach to new application mechanics" 
+        },
+        options: [
+          { key: "skip_fast", label: { vi: "Bấm 'Bỏ qua' (Skip) ngay lập tức để tự mò", en: "Skip immediately and explore intuitively" }, icon: "⏭️" },
+          { key: "read_slides", label: { vi: "Lướt xem nhanh qua vài slide ảnh tóm tắt", en: "Quickly swipe through 2-3 visual summary slides" }, icon: "📖" },
+          { key: "interactive", label: { vi: "Thích hướng dẫn dạng bấm thử từng bước thực tế", en: "Interactive hands-on walkthrough" }, icon: "🎯" },
+          { key: "video_demo", label: { vi: "Thích xem video ngắn 15s giới thiệu", en: "Short 15s video showcase" }, icon: "🎬" }
+        ]
+      },
+      {
+        id: "q8",
+        catIcon: "💾",
+        cat: { vi: "Bộ nhớ & Tài nguyên", en: "Storage & Footprint" },
+        title: { 
+          vi: "Dung lượng tải về của một app bao nhiêu là hợp lý với bạn?", 
+          en: "What is an acceptable initial app download size?" 
+        },
+        sub: { 
+          vi: "Mức dung lượng cài đặt không làm bạn ngần ngại", 
+          en: "Install size that won't make you hesitate" 
+        },
+        options: [
+          { key: "under_50mb", label: { vi: "Càng nhẹ càng tốt (< 50 MB)", en: "As light as possible (< 50 MB)" }, icon: "🪶" },
+          { key: "50_150mb", label: { vi: "Trung bình từ 50 - 150 MB", en: "Standard range: 50 - 150 MB" }, icon: "📦" },
+          { key: "over_200mb", label: { vi: "Trên 200 MB vẫn thoải mái nếu app xịn", en: "200+ MB is fine if quality is premium" }, icon: "🏢" },
+          { key: "pwa_web", label: { vi: "Thích dùng bản Web App không cần cài đặt", en: "Prefer Web App (PWA) with zero install" }, icon: "🌐" }
+        ]
+      },
+      {
+        id: "q9",
+        catIcon: "💎",
+        cat: { vi: "Mô hình thu phí (Monetization)", en: "Business Model" },
+        title: { 
+          vi: "Mô hình chi trả nào bạn cảm thấy dễ chịu nhất trong app?", 
+          en: "Which app pricing model do you find most acceptable?" 
+        },
+        sub: { 
+          vi: "Cách hỗ trợ nhà phát triển duy trì sản phẩm", 
+          en: "How you prefer supporting software developers" 
+        },
+        options: [
+          { key: "freemium_ads", label: { vi: "Miễn phí 100%, chấp nhận xem quảng cáo banner nhẹ", en: "100% Free, acceptable non-intrusive ads" }, icon: "📺" },
+          { key: "sub_monthly", label: { vi: "Thuê bao tháng/năm giá rẻ không quảng cáo", en: "Affordable Monthly / Annual Subscription" }, icon: "💳" },
+          { key: "lifetime", label: { vi: "Mua trọn đời 1 lần duy nhất (Lifetime)", en: "One-time Lifetime Purchase" }, icon: "👑" },
+          { key: "tip_jar", label: { vi: "Tùy tâm ủng hộ donate ly cà phê", en: "Voluntary Coffee Tip / Donation" }, icon: "☕" }
+        ]
+      },
+      {
+        id: "q10",
+        catIcon: "🤖",
+        cat: { vi: "Tính năng AI", en: "AI Integration" },
+        title: { 
+          vi: "Bạn có muốn app tích hợp Trợ lý Trí tuệ Nhân tạo (AI)?", 
+          en: "Do you want built-in AI Assistant features in the app?" 
+        },
+        sub: { 
+          vi: "Mức độ hỗ trợ tự động thông minh", 
+          en: "Smart automated assistant expectations" 
+        },
+        options: [
+          { key: "ai_chat", label: { vi: "Rất thích, có trợ lý chat hỏi đáp tự động", en: "Love it, interactive AI chat helper" }, icon: "💬" },
+          { key: "ai_smart_suggest", label: { vi: "Chỉ cần AI gợi ý ngầm (không cần chatbox)", en: "Only smart background suggestions (no chatbot)" }, icon: "💡" },
+          { key: "ai_voice", label: { vi: "Điều khiển và nhập liệu bằng giọng nói AI", en: "AI voice input and commands" }, icon: "🎙️" },
+          { key: "no_ai", label: { vi: "Không cần thiết, thích thao tác thủ công", en: "Not necessary, prefer manual control" }, icon: "🚫" }
+        ]
+      },
+      {
+        id: "q11",
+        catIcon: "🔒",
+        cat: { vi: "Quyền riêng tư", en: "Data Privacy" },
+        title: { 
+          vi: "Mức độ quan tâm của bạn về quyền riêng tư dữ liệu cá nhân?", 
+          en: "How important is personal data privacy to you?" 
+        },
+        sub: { 
+          vi: "Vị trí lưu trữ thông tin của bạn", 
+          en: "Where and how your data is handled" 
+        },
+        options: [
+          { key: "offline_first", label: { vi: "Lưu hoàn toàn trên máy (Offline-first, không gửi lên mạng)", en: "100% Offline-first (Stored strictly on device)" }, icon: "🛡️" },
+          { key: "encrypted_cloud", label: { vi: "Đồng bộ đám mây có mã hóa đầu cuối", en: "End-to-end encrypted cloud synchronization" }, icon: "☁️" },
+          { key: "normal", label: { vi: "Bình thường, miễn tiện lợi là được", en: "Standard cloud storage for convenience" }, icon: "👍" },
+          { key: "no_track", label: { vi: "Không thu thập dữ liệu hành vi tracking", en: "Zero tracking & zero telemetry policy" }, icon: "👁️" }
+        ]
+      },
+      {
+        id: "q12",
+        catIcon: "🔄",
+        cat: { vi: "Đồng bộ đa thiết bị", en: "Multi-device Sync" },
+        title: { 
+          vi: "Khả năng đồng bộ dữ liệu giữa Điện thoại và Máy tính?", 
+          en: "Real-time sync between Phone and Computer?" 
+        },
+        sub: { 
+          vi: "Nhu cầu làm việc liền mạch trên nhiều màn hình", 
+          en: "Need for seamless cross-platform continuity" 
+        },
+        options: [
+          { key: "must_have", label: { vi: "Rất quan trọng, phải chuyển qua lại liền mạch", en: "Crucial, must switch back & forth seamlessly" }, icon: "🔥" },
+          { key: "nice_to_have", label: { vi: "Có thì tốt, không có cũng không sao", en: "Nice to have, not a deal-breaker" }, icon: "🙂" },
+          { key: "mobile_only", label: { vi: "Chỉ cần dùng độc lập trên điện thoại", en: "Strictly mobile-only usage" }, icon: "📱" },
+          { key: "export_file", label: { vi: "Chỉ cần tính năng xuất file (JSON/Excel)", en: "Just need JSON/Excel backup export" }, icon: "📤" }
+        ]
+      },
+      {
+        id: "q13",
+        catIcon: "📳",
+        cat: { vi: "Rung phản hồi (Haptic)", en: "Haptic Feedback" },
+        title: { 
+          vi: "Bạn có thích hiệu ứng rung xúc giác (Haptic Touch) khi chạm?", 
+          en: "Do you enjoy subtle haptic vibration when tapping?" 
+        },
+        sub: { 
+          vi: "Cảm giác bấm chân thực trên màn hình cảm ứng", 
+          en: "Tactile sensation of physical feedback on screen" 
+        },
+        options: [
+          { key: "love_haptics", label: { vi: "Rất thích! Bấm có rung nhẹ tạo cảm giác 'sướng'", en: "Love it! Delicate clicks feel satisfying" }, icon: "✨" },
+          { key: "sound_better", label: { vi: "Thích âm thanh click vui tai hơn là rung", en: "Prefer subtle audio clicks over vibrations" }, icon: "🔊" },
+          { key: "silent", label: { vi: "Thích hoàn toàn im lặng, không rung không tiếng", en: "Prefer complete silence and no vibration" }, icon: "🤫" },
+          { key: "toggle", label: { vi: "Phải có công tắc bật/tắt trong cài đặt", en: "Must provide a clear toggle setting" }, icon: "⚙️" }
+        ]
+      },
+      {
+        id: "q14",
+        catIcon: "🔤",
+        cat: { vi: "Kiểu chữ (Typography)", en: "Typography & Readability" },
+        title: { 
+          vi: "Kiểu phông chữ nào làm bạn dễ chịu nhất khi đọc nội dung?", 
+          en: "Which font style provides the best reading experience?" 
+        },
+        sub: { 
+          vi: "Khả năng hiển thị và độ rõ nét của văn bản", 
+          en: "Clarity, spacing, and visual ergonomics" 
+        },
+        options: [
+          { key: "modern_sans", label: { vi: "Hiện đại, bo tròn nhẹ, gọn gàng (như Inter/SF Pro)", en: "Modern, clean sans-serif (Inter / SF Pro)" }, icon: "🔤" },
+          { key: "serif_classic", label: { vi: "Có chân cổ điển, phong cách tạp chí", en: "Classic elegant serif (Editorial look)" }, icon: "📜" },
+          { key: "large_bold", label: { vi: "Chữ to bản, đậm nét, dễ nhìn cho mắt", en: "Large & high-contrast bold fonts" }, icon: "🔍" },
+          { key: "system_default", label: { vi: "Dùng font mặc định của máy điện thoại", en: "Native system default font" }, icon: "⚙️" }
+        ]
+      },
+      {
+        id: "q15",
+        catIcon: "🗑️",
+        cat: { vi: "Lý do gỡ ứng dụng", en: "App Churn Reason" },
+        title: { 
+          vi: "Điều gì khiến bạn dễ gỡ cài đặt (Delete) một app nhất?", 
+          en: "What makes you uninstall an app fastest?" 
+        },
+        sub: { 
+          vi: "Yếu tố gây khó chịu nhất dẫn đến bỏ rơi ứng dụng", 
+          en: "The biggest friction causing you to abandon an app" 
+        },
+        options: [
+          { key: "too_many_ads", label: { vi: "Quảng cáo quá dày đặc hoặc ép xem video", en: "Intrusive popups & forced video ads" }, icon: "🛑" },
+          { key: "lag_crash", label: { vi: "Giật lag, nóng máy hoặc thỉnh thoảng bị văng", en: "Laggy UI, battery heat, or crashes" }, icon: "🔥" },
+          { key: "confusing_ui", label: { vi: "Giao diện rối rắm, tìm tính năng quá khó", en: "Cluttered UI, impossible to find features" }, icon: "🤯" },
+          { key: "paywall_early", label: { vi: "Vừa mở lên đã bắt nộp tiền / đăng ký thẻ", en: "Aggressive immediate paywall on launch" }, icon: "💸" }
+        ]
+      },
+      {
+        id: "q16",
+        catIcon: "🎮",
+        cat: { vi: "Game hóa (Gamification)", en: "Gamification" },
+        title: { 
+          vi: "Bạn có hứng thú với yếu tố cày cấp, điểm danh chuỗi (Streak)?", 
+          en: "Do you enjoy streaks, badges, and levels in apps?" 
+        },
+        sub: { 
+          vi: "Cơ chế tạo động lực quay lại mỗi ngày như game", 
+          en: "Playful mechanisms motivating daily return" 
+        },
+        options: [
+          { key: "love_streak", label: { vi: "Rất thích, giữ streak ngày tạo thói quen cực tốt", en: "Love it, daily streaks keep me committed" }, icon: "🔥" },
+          { key: "badges_rewards", label: { vi: "Thích thu thập huy hiệu & mở khóa quà thưởng", en: "Enjoy collecting achievement badges" }, icon: "🏅" },
+          { key: "neutral", label: { vi: "Bình thường, có cũng được không có cũng sao", en: "Neutral, don't pay much attention" }, icon: "😐" },
+          { key: "annoying", label: { vi: "Không thích, cảm thấy bị áp lực khi mất streak", en: "Dislike, creates unnecessary streak anxiety" }, icon: "🛑" }
+        ]
+      },
+      {
+        id: "q17",
+        catIcon: "📤",
+        cat: { vi: "Chia sẻ & Xã hội", en: "Social & Sharing" },
+        title: { 
+          vi: "Bạn có nhu cầu xuất ảnh đẹp để chia sẻ lên Story / Mạng xã hội?", 
+          en: "Do you like sharing aesthetic snapshots to Stories?" 
+        },
+        sub: { 
+          vi: "Tính năng tạo thẻ tóm tắt kết quả đẹp mắt", 
+          en: "Clean graphic cards ready for Instagram/Zalo" 
+        },
+        options: [
+          { key: "share_often", label: { vi: "Rất thích, nếu có ảnh card thiết kế đẹp và sang", en: "Yes! If the generated card is sleek & aesthetic" }, icon: "📸" },
+          { key: "private_only", label: { vi: "Chỉ dùng cho bản thân, không có nhu cầu khoe", en: "Private usage only, no desire to share" }, icon: "🔒" },
+          { key: "copy_link", label: { vi: "Chỉ cần copy link nhanh gửi cho bạn bè", en: "Just need a quick link copy button" }, icon: "🔗" },
+          { key: "export_pdf", label: { vi: "Thích xuất báo cáo định dạng file PDF hơn", en: "Prefer exporting formal PDF reports" }, icon: "📄" }
+        ]
+      },
+      {
+        id: "q18",
+        catIcon: "💬",
+        cat: { vi: "Kênh hỗ trợ người dùng", en: "Support Channel" },
+        title: { 
+          vi: "Khi gặp lỗi, bạn muốn liên hệ hỗ trợ qua kênh nào nhất?", 
+          en: "How would you prefer to get help when facing a bug?" 
+        },
+        sub: { 
+          vi: "Cầu nối trực tiếp với đội ngũ phát triển", 
+          en: "Direct communication with app creators" 
+        },
+        options: [
+          { key: "live_chat", label: { vi: "Nhắn tin trực tiếp ngay trong app", en: "In-app instant chat support" }, icon: "💬" },
+          { key: "zalo_tele", label: { vi: "Nhắn qua kênh Zalo / Telegram / Fanpage", en: "Message via Zalo / Telegram / Facebook" }, icon: "📲" },
+          { key: "email", label: { vi: "Gửi Email kèm ảnh chụp màn hình", en: "Formal email with screenshots" }, icon: "📧" },
+          { key: "feedback_form", label: { vi: "Biểu mẫu góp ý ẩn danh ngắn gọn", en: "Quick anonymous feedback box" }, icon: "📝" }
+        ]
+      },
+      {
+        id: "q19",
+        catIcon: "🧩",
+        cat: { vi: "Tiện ích ngoài (Widgets)", en: "Home Screen Widgets" },
+        title: { 
+          vi: "Bạn có thường đưa Widget của ứng dụng ra màn hình chính?", 
+          en: "Do you place app widgets on your Home Screen?" 
+        },
+        sub: { 
+          vi: "Xem thông tin nhanh mà không cần mở app", 
+          en: "Quick glanceable insights without launching" 
+        },
+        options: [
+          { key: "widget_daily", label: { vi: "Có, dùng widget mỗi ngày để theo dõi nhanh", en: "Yes, use widgets daily for instant overview" }, icon: "📌" },
+          { key: "lock_screen", label: { vi: "Thích widget trên màn hình khóa (Lock Screen)", en: "Prefer compact Lock Screen widgets" }, icon: "🔐" },
+          { key: "rarely", label: { vi: "Hiếm khi, thích màn hình chính trống trải", en: "Rarely, prefer a clean home screen" }, icon: "🧹" },
+          { key: "smart_stack", label: { vi: "Gộp vào ngăn xếp thông minh (Smart Stack)", en: "Stacked inside smart widget rotation" }, icon: "📚" }
+        ]
+      },
+      {
+        id: "q20",
+        catIcon: "⭐",
+        cat: { vi: "Giá trị cốt lõi", en: "Core Value" },
+        title: { 
+          vi: "Điều gì giữ chân bạn gắn bó lâu dài nhất với một app?", 
+          en: "What makes you stay loyal to an app for years?" 
+        },
+        sub: { 
+          vi: "Lý do quan trọng nhất bạn không thể xóa ứng dụng", 
+          en: "The single most crucial factor for retention" 
+        },
+        options: [
+          { key: "solves_problem", label: { vi: "Giải quyết đúng vấn đề thực tế, tiết kiệm thời gian", en: "Solves real problems & saves precious time" }, icon: "🎯" },
+          { key: "great_community", label: { vi: "Cộng đồng người dùng đông vui, nhiều chia sẻ", en: "Vibrant active community & insights" }, icon: "👥" },
+          { key: "dev_updates", label: { vi: "Đội ngũ liên tục cập nhật, lắng nghe người dùng", en: "Passionate devs who listen & update often" }, icon: "🚀" },
+          { key: "emotional_design", label: { vi: "Thiết kế có cảm xúc, đem lại niềm vui mỗi lần mở", en: "Delightful design that sparks everyday joy" }, icon: "💖" }
+        ]
+      }
+    ];
+
+    /* =====================================================================
+       4. 6 MYSTERY REWARD CARDS (STEP 21 - PHYSICAL GIFTS)
+       ===================================================================== */
+    const REWARDS_CARDS = [
+      {
+        id: "c1",
+        code: "TEA",
+        title: { vi: "Vận May Gõ Cửa", en: "Doorbell of Luck" },
+        reward: { vi: "1 tràng Pháo Tay", en: "1 Round of Applause" },
+        icon: "🍀",
+        color: "from-amber-500/20 to-pink-500/20 border-amber-400/40"
+      },
+      {
+        id: "c2",
+        code: "CAFE",
+        title: { vi: "Hộp Quà Bí Ẩn", en: "Mystery Gift Box" },
+        reward: { vi: "5000 VND", en: "5,000 VND" },
+        icon: "🎁",
+        color: "from-amber-700/20 to-orange-500/20 border-orange-400/40"
+      },
+      {
+        id: "c3",
+        code: "DESKPAD",
+        title: { vi: "Tri Ân Ngọt Ngào", en: "Heartfelt Appreciation" },
+        reward: { vi: "1 tấm Chân tình ", en: "1 Heartfelt Note" },
+        icon: "💖",
+        color: "from-blue-600/20 to-cyan-400/20 border-cyan-400/40"
+      },
+      {
+        id: "c4",
+        code: "KEYCHAIN",
+        title: { vi: "Hào Quang Tỏa Sáng", en: "Radiant Glow" },
+        reward: { vi: "1 lời chúc tối đẹp", en: "1 Good Night Wish" },
+        icon: "✨",
+        color: "from-purple-600/20 to-pink-400/20 border-purple-400/40"
+      },
+      {
+        id: "c5",
+        code: "SNACK",
+        title: { vi: "Bất Ngờ Chờ Đón", en: "Unexpected Delight" },
+        reward: { vi: "1 Hộp Snack Bánh Kẹo Nạp Năng Lượng", en: "1 Delicious Energy Snack Pack" },
+        icon: "🎉",
+        color: "from-rose-500/20 to-red-600/20 border-rose-400/40"
+      },
+      {
+        id: "c6",
+        code: "STAND",
+        title: { vi: "Duyên May Gặp Gỡ", en: "Fateful Encounter" },
+        reward: { vi: "1 yêu cầu được chấp nhận", en: "1 Request Granted" },
+        icon: "📱",
+        color: "from-emerald-500/20 to-teal-400/20 border-emerald-400/40"
+      }
+    ];
+
+    /* =====================================================================
+       5. STATE MANAGEMENT
+       ===================================================================== */
+    let currentStep = 0; // 0..19 (Questions 1..20), 20 (Mystery Card Flip), 21 (Stats)
+    const userAnswers = {};
+    let chosenReward = null;
+    let hasClaimed = false;
+
+    // DOM Elements
+    const questionView = document.getElementById('questionView');
+    const rewardView = document.getElementById('rewardView');
+    const statsView = document.getElementById('statsView');
+    
+    const questionStepLabel = document.getElementById('questionStepLabel');
+    const progressPercent = document.getElementById('progressPercent');
+    const progressBar = document.getElementById('progressBar');
+    const questionCategoryIcon = document.getElementById('questionCategoryIcon');
+    const questionCategory = document.getElementById('questionCategory');
+    const questionTitle = document.getElementById('questionTitle');
+    const questionSubtitle = document.getElementById('questionSubtitle');
+    const optionsContainer = document.getElementById('optionsContainer');
+    const prevBtn = document.getElementById('prevBtn');
+
+    /* =====================================================================
+       6. SOUND SYNTHESIZER (JOYFUL CHIME / MUSIC BOX)
+       ===================================================================== */
+    let audioCtx = null;
+    let isBgmPlaying = false;
+    let bgmInterval = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playNote(freq, type = 'sine', duration = 0.4, gainLevel = 0.08) {
+      if (!audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+        gain.gain.setValueAtTime(gainLevel, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        console.warn("Audio note error:", e);
+      }
+    }
+
+    // Play joyful tap feedback sound
+    function playTapSound() {
+      initAudio();
+      playNote(523.25, 'triangle', 0.15, 0.06); // C5
+      setTimeout(() => playNote(659.25, 'sine', 0.2, 0.05), 60); // E5
+    }
+
+    // Play fanfare card flip celebration
+    function playCelebrationSound() {
+      initAudio();
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        setTimeout(() => playNote(freq, 'triangle', 0.5, 0.09), idx * 110);
+      });
+    }
+
+    // Cheerful Music Box background loop
+    const CHEERFUL_MELODY = [
+      523.25, 659.25, 783.99, 659.25, 880.00, 783.99, 659.25, 587.33,
+      523.25, 659.25, 783.99, 1046.50, 880.00, 783.99, 659.25, 523.25
+    ];
+    let noteIndex = 0;
+
+    function toggleBgm() {
+      initAudio();
+      isBgmPlaying = !isBgmPlaying;
+      const eqIcon = document.getElementById('eqIcon');
+      const musicBtnLabel = document.getElementById('musicBtnLabel');
+
+      if (isBgmPlaying) {
+        musicBtnLabel.textContent = I18N[currentLang].musicOff;
+        eqIcon.classList.remove('opacity-40');
+        bgmInterval = setInterval(() => {
+          if (isBgmPlaying && audioCtx) {
+            playNote(CHEERFUL_MELODY[noteIndex], 'sine', 0.5, 0.035);
+            noteIndex = (noteIndex + 1) % CHEERFUL_MELODY.length;
+          }
+        }, 420);
+      } else {
+        musicBtnLabel.textContent = I18N[currentLang].musicLabel;
+        eqIcon.classList.add('opacity-40');
+        if (bgmInterval) clearInterval(bgmInterval);
+      }
+    }
+
+    document.getElementById('musicToggleBtn').addEventListener('click', toggleBgm);
+
+    /* =====================================================================
+       7. SAKURA BLOSSOMS CANVAS PARTICLES (FALLING OVER ALL UI)
+       ===================================================================== */
+    const canvas = document.getElementById('sakuraCanvas');
+    const ctx = canvas.getContext('2d');
+    let petals = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class SakuraPetal {
+      constructor() {
+        this.reset(true);
+      }
+      reset(initial = false) {
+        this.x = Math.random() * canvas.width;
+        this.y = initial ? Math.random() * canvas.height : -30;
+        this.size = Math.random() * 9 + 8;
+        this.speedX = (Math.random() - 0.5) * 1.5 + 0.8;
+        this.speedY = Math.random() * 1.2 + 1.1;
+        this.angle = Math.random() * Math.PI * 2;
+        this.angleSpeed = (Math.random() - 0.5) * 0.03;
+        this.flip = Math.random() * Math.PI;
+        this.flipSpeed = Math.random() * 0.04 + 0.02;
+        this.alpha = Math.random() * 0.4 + 0.5;
+        this.colorType = Math.random() > 0.3 ? '#fbcfe8' : '#f472b6';
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.angle += this.angleSpeed;
+        this.flip += this.flipSpeed;
+
+        if (this.y > canvas.height + 30 || this.x > canvas.width + 30) {
+          this.reset(false);
+        }
+      }
+      draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        ctx.scale(Math.cos(this.flip), 1);
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.colorType;
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-this.size / 2, -this.size / 2, -this.size, this.size / 3, 0, this.size);
+        ctx.bezierCurveTo(this.size, this.size / 3, this.size / 2, -this.size / 2, 0, 0);
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
+
+    const PETALS_COUNT = Math.min(38, Math.floor(window.innerWidth / 28));
+    for (let i = 0; i < PETALS_COUNT; i++) {
+      petals.push(new SakuraPetal());
+    }
+
+    function animateSakura() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      petals.forEach(p => {
+        p.update();
+        p.draw();
+      });
+      requestAnimationFrame(animateSakura);
+    }
+    animateSakura();
+
+    /* =====================================================================
+       8. RENDER QUESTIONS & INTERACTIONS
+       ===================================================================== */
+    function renderQuestion(index) {
+      const q = QUESTIONS_DATA[index];
+      const lang = currentLang;
+
+      // Update text
+      questionStepLabel.textContent = `${I18N[lang].stepPrefix} ${index + 1} / 20`;
+      const pct = Math.round(((index + 1) / 20) * 100);
+      progressPercent.textContent = `${pct}%`;
+      progressBar.style.width = `${pct}%`;
+
+      questionCategoryIcon.textContent = q.catIcon;
+      questionCategory.textContent = q.cat[lang];
+      questionTitle.textContent = q.title[lang];
+      questionSubtitle.textContent = q.sub[lang];
+
+      // Back button visibility
+      if (index > 0) {
+        prevBtn.classList.remove('hidden');
+        prevBtn.classList.add('flex');
+      } else {
+        prevBtn.classList.remove('flex');
+        prevBtn.classList.add('hidden');
+      }
+
+      // Render options
+      optionsContainer.innerHTML = '';
+      const selectedKey = userAnswers[q.id];
+
+      q.options.forEach((opt) => {
+        const isChosen = selectedKey === opt.key;
+        const btn = document.createElement('button');
+        btn.className = `group relative w-full p-4 sm:p-4.5 rounded-xl border text-left transition-all duration-200 flex items-center justify-between active:scale-[0.98] ${
+          isChosen
+            ? 'bg-gradient-to-r from-pink-500/25 via-purple-500/20 to-slate-800 border-pink-400 shadow-md shadow-pink-500/10'
+            : 'bg-slate-800/60 hover:bg-slate-800 border-slate-700/60 hover:border-slate-500/80 text-slate-200'
+        }`;
+
+        btn.innerHTML = `
+          <div class="flex items-center gap-3.5 pr-2">
+            <span class="text-xl sm:text-2xl transition-transform group-hover:scale-110">${opt.icon}</span>
+            <span class="text-xs sm:text-sm font-semibold tracking-wide ${isChosen ? 'text-pink-200 font-bold' : 'text-slate-200'}">
+              ${opt.label[lang]}
+            </span>
+          </div>
+          <div class="w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+            isChosen ? 'border-pink-400 bg-pink-500' : 'border-slate-600 bg-slate-900/40'
+          }">
+            ${isChosen ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>' : ''}
+          </div>
+        `;
+
+        btn.addEventListener('click', () => {
+          playTapSound();
+          userAnswers[q.id] = opt.key;
+          renderQuestion(index); // Re-render to show active state instantly
+
+          setTimeout(() => {
+            if (currentStep < QUESTIONS_DATA.length - 1) {
+              currentStep++;
+              renderQuestion(currentStep);
+            } else {
+              // Proceed to Step 21: Mystery Card Flip
+              goToRewardView();
+            }
+          }, 240);
+        });
+
+        optionsContainer.appendChild(btn);
+      });
+    }
+
+    prevBtn.addEventListener('click', () => {
+      if (currentStep > 0) {
+        playTapSound();
+        currentStep--;
+        renderQuestion(currentStep);
+      }
+    });
+
+    /* =====================================================================
+       9. STEP 21: MYSTERY CARD FLIP & REWARDS
+       ===================================================================== */
+    function goToRewardView() {
+      questionView.classList.add('hidden');
+      rewardView.classList.remove('hidden');
+      statsView.classList.add('hidden');
+      renderRewardCards();
+    }
+
+    function renderRewardCards() {
+      const grid = document.getElementById('cardsGrid');
+      grid.innerHTML = '';
+      const lang = currentLang;
+
+      // Shuffle cards for a fun mystery experience
+      const shuffled = [...REWARDS_CARDS].sort(() => 0.5 - Math.random());
+
+      shuffled.forEach((c) => {
+        const cardWrapper = document.createElement('div');
+        cardWrapper.className = 'w-full h-44 sm:h-56';
+
+        cardWrapper.innerHTML = `
+          <div class="card-inner" data-card-id="${c.id}">
+            <!-- CARD FRONT (Face down) -->
+            <div class="card-face flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-b from-slate-800 via-slate-900 to-[#121324] border-2 border-pink-500/40 shadow-xl hover:border-pink-400 transition-all">
+              <div class="w-12 h-12 rounded-full bg-pink-500/10 border border-pink-400/30 flex items-center justify-center mb-2 animate-pulse">
+                <svg class="w-6 h-6 text-pink-300" viewBox="0 0 100 100" fill="currentColor">
+                  <rect x="20" y="20" width="60" height="60" rx="3" transform="rotate(0 50 50)" />
+                  <rect x="20" y="20" width="60" height="60" rx="3" transform="rotate(45 50 50)" opacity="0.8" />
+                  <circle cx="50" cy="50" r="10" fill="#0c0d16" />
+                </svg>
+              </div>
+              <span class="text-[11px] sm:text-xs font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-pink-300 uppercase">
+                ${c.title[lang]}
+              </span>
+              <span class="text-[10px] text-slate-400 mt-1 font-medium">
+                ${lang === 'vi' ? 'Chạm để lật' : 'Tap to reveal'}
+              </span>
+            </div>
+
+            <!-- CARD BACK (Revealed) -->
+            <div class="card-face card-back flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-b ${c.color} bg-slate-900 border-2 border-amber-300 shadow-2xl">
+              <span class="text-3xl sm:text-4xl mb-1">${c.icon}</span>
+              <span class="text-xs sm:text-sm font-black text-amber-200 text-center leading-tight mb-1">
+                ${c.reward[lang]}
+              </span>
+              <span class="text-[9px] font-bold text-pink-300 tracking-wider uppercase">
+                ${lang === 'vi' ? 'QUÀ TẶNG THỰC TẾ' : 'VERIFIED REWARD'}
+              </span>
+            </div>
+          </div>
+        `;
+
+        cardWrapper.addEventListener('click', () => {
+          if (hasClaimed) return;
+          hasClaimed = true;
+          chosenReward = c;
+
+          const inner = cardWrapper.querySelector('.card-inner');
+          inner.classList.add('is-flipped');
+
+          playCelebrationSound();
+
+          // Double confetti cannon!
+          confetti({ particleCount: 70, spread: 60, origin: { y: 0.7 } });
+          setTimeout(() => {
+            confetti({ particleCount: 90, spread: 100, origin: { y: 0.6 } });
+          }, 350);
+
+          // Save survey answers directly to Firebase!
+          saveVoteToFirebase(c);
+
+          // Show reward notice box
+          setTimeout(() => {
+            const resBox = document.getElementById('rewardResultBox');
+            document.getElementById('rewardRevealedName').textContent = c.reward[lang];
+            resBox.classList.remove('hidden');
+          }, 600);
+        });
+
+        grid.appendChild(cardWrapper);
+      });
+    }
+
+    /* =====================================================================
+       10. FIREBASE REAL DATABASE PERSISTENCE & SYNC
+       ===================================================================== */
+    function saveVoteToFirebase(rewardObj) {
+      const payload = {
+        timestamp: firebase.database.ServerValue.TIMESTAMP,
+        rewardId: rewardObj.id,
+        rewardName: rewardObj.reward.vi,
+        answers: userAnswers
+      };
+
+      if (isFirebaseReady && db) {
+        db.ref('survey_submissions').push(payload)
+          .then(() => {
+            console.log("Recorded to Firebase Realtime Database!");
+          })
+          .catch(err => {
+            console.error("Firebase push error:", err);
+            saveToLocalFallback(payload);
+          });
+      } else {
+        saveToLocalFallback(payload);
+      }
+    }
+
+    function saveToLocalFallback(payload) {
+      let localData = JSON.parse(localStorage.getItem('app_survey_votes') || '[]');
+      localData.push(payload);
+      localStorage.setItem('app_survey_votes', JSON.stringify(localData));
+    }
+
+    /* =====================================================================
+       11. REAL DATABASE STATISTICS VIEW
+       ===================================================================== */
+    function showStatistics() {
+      rewardView.classList.add('hidden');
+      questionView.classList.add('hidden');
+      statsView.classList.remove('hidden');
+
+      const statsContent = document.getElementById('statsContentList');
+      const totalParticipantsLabel = document.getElementById('statsTotalParticipants');
+      totalParticipantsLabel.textContent = I18N[currentLang].statsLoading;
+      statsContent.innerHTML = '';
+
+      if (isFirebaseReady && db) {
+        db.ref('survey_submissions').once('value')
+          .then(snapshot => {
+            const data = snapshot.val() || {};
+            const submissions = Object.values(data);
+            renderStatsData(submissions);
+          })
+          .catch(err => {
+            console.warn("Read Firebase error, fallback to local:", err);
+            const fallbackSubmissions = JSON.parse(localStorage.getItem('app_survey_votes') || '[]');
+            renderStatsData(fallbackSubmissions);
+          });
+      } else {
+        const fallbackSubmissions = JSON.parse(localStorage.getItem('app_survey_votes') || '[]');
+        renderStatsData(fallbackSubmissions);
+      }
+    }
+
+    function renderStatsData(submissions) {
+      const lang = currentLang;
+      const totalCount = submissions.length;
+      const totalParticipantsLabel = document.getElementById('statsTotalParticipants');
+      const statsContent = document.getElementById('statsContentList');
+
+      totalParticipantsLabel.textContent = I18N[lang].statsTotal(totalCount);
+      statsContent.innerHTML = '';
+
+      if (totalCount === 0) {
+        statsContent.innerHTML = `<p class="py-8 text-center text-slate-400">${lang === 'vi' ? 'Chưa có lượt bình chọn nào được ghi nhận.' : 'No participant votes recorded yet.'}</p>`;
+        return;
+      }
+
+      QUESTIONS_DATA.forEach((q, idx) => {
+        // Count votes per option
+        const counts = {};
+        q.options.forEach(opt => counts[opt.key] = 0);
+
+        submissions.forEach(sub => {
+          if (sub.answers && sub.answers[q.id]) {
+            const chosen = sub.answers[q.id];
+            if (counts[chosen] !== undefined) counts[chosen]++;
+          }
+        });
+
+        const qCard = document.createElement('div');
+        qCard.className = 'py-5';
+
+        let optionsHtml = '';
+        q.options.forEach(opt => {
+          const voteCount = counts[opt.key] || 0;
+          const pct = totalCount > 0 ? Math.round((voteCount / totalCount) * 100) : 0;
+          const isUserPick = userAnswers[q.id] === opt.key;
+
+          optionsHtml += `
+            <div class="mb-3">
+              <div class="flex items-center justify-between text-xs sm:text-sm font-semibold mb-1">
+                <span class="flex items-center gap-2 ${isUserPick ? 'text-pink-300 font-bold' : 'text-slate-300'}">
+                  <span>${opt.icon}</span>
+                  <span>${opt.label[lang]}</span>
+                  ${isUserPick ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/40">${I18N[lang].yourChoice}</span>` : ''}
+                </span>
+                <span class="text-slate-400 font-mono">${I18N[lang].votesCount(voteCount, pct)}</span>
+              </div>
+              <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full ${isUserPick ? 'bg-pink-500' : 'bg-indigo-500/80'} rounded-full transition-all duration-700" style="width: ${pct}%;"></div>
+              </div>
+            </div>
+          `;
+        });
+
+        qCard.innerHTML = `
+          <div class="flex items-center gap-2 text-xs font-bold text-pink-400 mb-1">
+            <span>${q.catIcon}</span>
+            <span>${q.cat[lang]}</span>
+          </div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-100 mb-3">
+            ${idx + 1}. ${q.title[lang]}
+          </h3>
+          <div class="space-y-1">${optionsHtml}</div>
+        `;
+
+        statsContent.appendChild(qCard);
+      });
+    }
+
+    // Action buttons in Reward & Stats
+    document.getElementById('viewStatsBtn').addEventListener('click', showStatistics);
+
+    document.getElementById('copyGiftBtn').addEventListener('click', () => {
+      if (!chosenReward) return;
+      const lang = currentLang;
+      const rewardName = chosenReward.reward[lang];
+      const msg = I18N[lang].shareMsg(rewardName);
+
+      navigator.clipboard.writeText(msg).then(() => {
+        const btnLabel = document.getElementById('copyGiftBtnLabel');
+        btnLabel.textContent = I18N[lang].copied;
+        setTimeout(() => {
+          btnLabel.textContent = I18N[lang].copyBtn;
+        }, 2500);
+      });
+    });
+
+    document.getElementById('retakeSurveyBtn').addEventListener('click', () => {
+      window.location.reload();
+    });
+
+    /* =====================================================================
+       12. LANGUAGE TOGGLE (VI / EN)
+       ===================================================================== */
+    const langToggleBtn = document.getElementById('langToggleBtn');
+
+    function applyLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('app_survey_lang', lang);
+
+      document.getElementById('langFlag').textContent = I18N[lang].flag;
+      document.getElementById('langText').textContent = I18N[lang].langText;
+      document.getElementById('headerSubtitle').textContent = I18N[lang].headerSub;
+      document.getElementById('tipLabel').textContent = I18N[lang].tipLabel;
+      document.getElementById('prevBtnLabel').textContent = I18N[lang].prevBtn;
+
+      document.getElementById('rewardBadge').textContent = I18N[lang].rewardBadge;
+      document.getElementById('rewardMainHeading').textContent = I18N[lang].rewardMain;
+      document.getElementById('rewardPrompt').textContent = I18N[lang].rewardPrompt;
+      document.getElementById('claimNoticeText').textContent = I18N[lang].claimNotice;
+      document.getElementById('copyGiftBtnLabel').textContent = I18N[lang].copyBtn;
+      document.getElementById('viewStatsBtnLabel').textContent = I18N[lang].viewStatsBtn;
+      document.getElementById('statsTitle').textContent = I18N[lang].statsTitle;
+      document.getElementById('retakeBtnLabel').textContent = I18N[lang].retakeBtn;
+      document.getElementById('footerCopy').textContent = I18N[lang].footerText;
+
+      const musicBtnLabel = document.getElementById('musicBtnLabel');
+      musicBtnLabel.textContent = isBgmPlaying ? I18N[lang].musicOff : I18N[lang].musicLabel;
+
+      if (!questionView.classList.contains('hidden')) {
+        renderQuestion(currentStep);
+      } else if (!rewardView.classList.contains('hidden')) {
+        renderRewardCards();
+        if (chosenReward) {
+          document.getElementById('rewardRevealedName').textContent = chosenReward.reward[lang];
+        }
+      } else if (!statsView.classList.contains('hidden')) {
+        showStatistics();
+      }
+    }
+
+    langToggleBtn.addEventListener('click', () => {
+      const nextLang = currentLang === 'vi' ? 'en' : 'vi';
+      applyLanguage(nextLang);
+    });
+
+    // Initial run
+    applyLanguage(currentLang);
+    renderQuestion(0);
+  </script>
+</body>
+</html>
